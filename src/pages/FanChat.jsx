@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { chatAPI } from '../services/api'
 
-// Dummy initial messages
-const initialMessages = [
+// Fallback initial messages if API fails
+const fallbackMessages = [
   {
     id: 1,
     username: "CricketFan101",
@@ -40,12 +41,46 @@ const initialMessages = [
 ]
 
 const FanChat = () => {
-  const [messages, setMessages] = useState(initialMessages)
+  const [messages, setMessages] = useState([])
   const [inputMessage, setInputMessage] = useState('')
   const [username] = useState('You')
   const [onlineUsers] = useState(1247)
+  const [loading, setLoading] = useState(true)
   const messagesEndRef = useRef(null)
   const chatContainerRef = useRef(null)
+
+  // Fetch messages from API on mount
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        setLoading(true)
+        const result = await chatAPI.getMessages(100)
+        
+        if (result.success && result.data.length > 0) {
+          // Transform API data to match component format
+          const transformedMessages = result.data.map((msg, index) => ({
+            id: msg._id || index + 1,
+            username: msg.username,
+            message: msg.message,
+            timestamp: new Date(msg.timestamp),
+            isOwn: msg.isOwn
+          }))
+          setMessages(transformedMessages)
+        } else {
+          // Use fallback messages if no data
+          setMessages(fallbackMessages)
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error)
+        // Use fallback messages on error
+        setMessages(fallbackMessages)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMessages()
+  }, [])
 
   // Scroll to bottom when new message is added
   const scrollToBottom = () => {
@@ -72,21 +107,45 @@ const FanChat = () => {
   }
 
   // Handle send message
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault()
     
     if (inputMessage.trim() === '') return
 
-    const newMessage = {
-      id: messages.length + 1,
-      username: username,
-      message: inputMessage.trim(),
-      timestamp: new Date(),
-      isOwn: true
-    }
+    try {
+      // Post message to API
+      const result = await chatAPI.postMessage({
+        username: username.trim(),
+        message: inputMessage.trim(),
+        isOwn: true
+      })
 
-    setMessages([...messages, newMessage])
-    setInputMessage('')
+      if (result.success) {
+        // Transform API response to match component format
+        const newMessage = {
+          id: result.data._id || messages.length + 1,
+          username: result.data.username,
+          message: result.data.message,
+          timestamp: new Date(result.data.timestamp),
+          isOwn: result.data.isOwn
+        }
+
+        setMessages([...messages, newMessage])
+        setInputMessage('')
+      }
+    } catch (error) {
+      console.error('Error sending message:', error)
+      // Fallback: Add message locally even if API fails
+      const newMessage = {
+        id: messages.length + 1,
+        username: username.trim(),
+        message: inputMessage.trim(),
+        timestamp: new Date(),
+        isOwn: true
+      }
+      setMessages([...messages, newMessage])
+      setInputMessage('')
+    }
   }
 
   // Handle Enter key press

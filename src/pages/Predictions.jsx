@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+import { predictionsAPI } from '../services/api'
 
-// Dummy prediction data
-const dummyPredictions = [
+// Fallback dummy prediction data
+const fallbackPredictions = [
   {
     id: 1,
     team1: {
@@ -127,11 +128,23 @@ const Predictions = () => {
     const fetchPredictions = async () => {
       try {
         setLoading(true)
-        await new Promise(resolve => setTimeout(resolve, 1200))
-        setPredictions(dummyPredictions)
-        setSelectedMatch(dummyPredictions[0])
-      } catch (err) {
-        console.error(err)
+        
+        // Fetch from backend API
+        const result = await predictionsAPI.getAll()
+        
+        if (result.success && result.data.length > 0) {
+          setPredictions(result.data)
+          setSelectedMatch(result.data[0])
+        } else {
+          // Use fallback data
+          setPredictions(fallbackPredictions)
+          setSelectedMatch(fallbackPredictions[0])
+        }
+      } catch (error) {
+        console.error('Error fetching predictions:', error)
+        // Use fallback data on error
+        setPredictions(fallbackPredictions)
+        setSelectedMatch(fallbackPredictions[0])
       } finally {
         setLoading(false)
       }

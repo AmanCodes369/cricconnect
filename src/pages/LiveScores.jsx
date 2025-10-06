@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { matchesAPI } from '../services/api'
 
-// Dummy cricket match data (simulating API response)
-const dummyMatchData = [
+// Fallback dummy data in case API fails
+const fallbackMatchData = [
   {
     id: 1,
     team1: {
@@ -137,17 +138,19 @@ const LiveScores = () => {
         setLoading(true)
         setError(null)
         
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 1500))
+        // Fetch from backend API
+        const result = await matchesAPI.getAll()
         
-        // Simulate random API failure (10% chance)
-        if (Math.random() < 0.1) {
-          throw new Error('Failed to fetch match data. Please try again.')
+        if (result.success) {
+          setMatches(result.data)
+        } else {
+          throw new Error(result.message || 'Failed to fetch matches')
         }
-        
-        setMatches(dummyMatchData)
       } catch (err) {
+        console.error('Error fetching matches:', err)
         setError(err.message)
+        // Use fallback data if API fails
+        setMatches(fallbackMatchData)
       } finally {
         setLoading(false)
       }
